@@ -3,7 +3,7 @@ variable instance_type {
 }
 
 variable key_name {
-  default = "cmu_default"
+  default = "cmu_cc_default"
 }
 
 variable ami {

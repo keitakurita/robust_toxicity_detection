@@ -2,5 +2,6 @@
 *.zip
 
 .terraform
+terraform.tfstate*
 GH_TOKEN
 setup.sh
