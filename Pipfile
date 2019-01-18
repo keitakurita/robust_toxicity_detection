@@ -4,6 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+pandas = "*"
+numpy = "*"
+torch = "*"
+torchvision = "*"
+allennlp = "*"
+jupyter = "*"
 
 [dev-packages]
 
