@@ -11,6 +11,8 @@ torchvision = "*"
 jupyter = "*"
 papermill = "*"
 allennlp = "*"
+pymongo = "*"
+dnspython = "*"
 
 [dev-packages]
 
