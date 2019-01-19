@@ -1,0 +1,9 @@
+id: null
+# experiment parameters
+notebook: SST_allennlp.ipynb
+terraform_vars:
+    instance_type: t2.micro
+parameters:
+    testing: True
+    lr: 0.005
+    epochs: 4

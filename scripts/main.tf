@@ -37,10 +37,6 @@ resource "aws_security_group" "sg" {
       "0.0.0.0/0",
     ]
   }
-
-  tags {
-    Project = "Phase3"
-  }
 }
 
 data "template_file" "user_data" {
@@ -66,13 +62,9 @@ resource "aws_spot_instance_request" "experiment" {
   ]
 
   connection {
-    user = "ubuntu"
-
-    # TODO: Figure out how to prevent this dependency while
-    # still enabling connection
-    private_key = "${file("~/.ssh/cc_team_default.pem")}"
-
-    host = "${aws_spot_instance_request.experiment.public_ip}"
+    user        = "ubuntu"
+    private_key = "${file("~/.ssh/cmu_cc_default.pem")}"
+    host        = "${aws_spot_instance_request.experiment.public_ip}"
   }
 
   # this is needed to add tags
@@ -82,8 +74,13 @@ resource "aws_spot_instance_request" "experiment" {
   }
 
   provisioner "file" {
-    source      = "../frontend/setup.sh"
+    source      = "./setup.sh"
     destination = "/tmp/setup.sh"
+  }
+
+  provisioner "file" {
+    source      = "${var.config_file}"
+    destination = "/tmp/${var.config_file}"
   }
 
   provisioner "remote-exec" {

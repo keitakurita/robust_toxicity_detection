@@ -9,3 +9,5 @@ variable key_name {
 variable ami {
   default = "ami-059eeca93cf09eebd"
 }
+
+variable config_file {}
