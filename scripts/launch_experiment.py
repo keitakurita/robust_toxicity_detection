@@ -4,7 +4,7 @@ import sys
 import argparse
 import yaml
 
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='Deploy spot instance and run experiment')
 parser.add_argument('--dryrun', action="store_true",
                     help='Run terraform plan, not apply')
 parser.add_argument('--file', '-f', type=str,
