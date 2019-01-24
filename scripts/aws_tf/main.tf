@@ -39,10 +39,6 @@ resource "aws_security_group" "sg" {
   }
 }
 
-data "template_file" "user_data" {
-  template = "${file("./setup.sh")}"
-}
-
 resource "aws_spot_instance_request" "experiment" {
   # spot_price      = "${var.spot_price}"
 
@@ -70,17 +66,22 @@ resource "aws_spot_instance_request" "experiment" {
   # this is needed to add tags
   provisioner "local-exec" {
     # copied from https://github.com/terraform-providers/terraform-provider-aws/issues/32
-    command = "./add_tags.sh ${aws_spot_instance_request.experiment.id} ${aws_spot_instance_request.experiment.spot_instance_id}"
+    command = "${path.module}/add_tags.sh ${aws_spot_instance_request.experiment.id} ${aws_spot_instance_request.experiment.spot_instance_id}"
   }
 
   provisioner "file" {
-    source      = "./setup.sh"
+    source      = "${path.module}/setup.sh"
     destination = "/tmp/setup.sh"
   }
 
   provisioner "file" {
     source      = "${var.config_file}"
-    destination = "/tmp/${var.config_file}"
+    destination = "/tmp/experiment_config.yaml"
+  }
+
+  provisioner "file" {
+    source      = "${var.notebook}"
+    destination = "/tmp/${basename(var.notebook)}"
   }
 
   provisioner "remote-exec" {

@@ -8,6 +8,8 @@ git clone https://$GH_TOKEN@github.com/keitakurita/NNforNLP_Final.git /home/ubun
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-get -y update
 sudo apt install -y python3.6
+sudo apt-get install build-essential
+sudo apt-get install python3.6-dev
 
 # install pipenv and packages
 curl https://raw.githubusercontent.com/kennethreitz/pipenv/master/get-pipenv.py | sudo python3.6
