@@ -29,7 +29,7 @@ def run(config: dict):
         run_id = _config_rep(config["parameters"])
     else:
         run_id = config["id"]
-    out_nb = "s3://nnfornlp/notebooks/{in_nb.stem}_{run_id}.ipynb"
+    out_nb = f"s3://nnfornlp/notebooks/{in_nb.stem}_{run_id}.ipynb"
     # register so that notebook can reference
     config["parameters"]["run_id"] = run_id
 

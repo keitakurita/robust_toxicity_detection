@@ -1,10 +1,7 @@
 id: null
 # experiment parameters
-notebook: ../notebooks/SST_allennlp.ipynb
+notebook: ../notebooks/papermill_test.ipynb
 terraform_vars:
     instance_type: t2.medium
 parameters:
-    testing: True
-    lr: 0.005
-    epochs: 1
-    download_data: True
+    foo: 100

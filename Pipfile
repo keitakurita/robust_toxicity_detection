@@ -15,6 +15,7 @@ pymongo = "*"
 dnspython = "*"
 
 [dev-packages]
+python-terraform = "*"
 
 [requires]
 python_version = "3.6"

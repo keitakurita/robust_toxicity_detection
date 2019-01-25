@@ -3,6 +3,7 @@ from python_terraform import *
 import sys
 import argparse
 import yaml
+import time
 
 parser = argparse.ArgumentParser(description='Deploy spot instance and run experiment')
 parser.add_argument('--file', '-f', type=str,
@@ -13,6 +14,8 @@ parser.add_argument('--terraform', '-t', type=str,
                     help="Directory to target with terraform")
 parser.add_argument('--dryrun', action="store_true",
                     help='Run terraform plan, not apply')
+parser.add_argument('--duration', "-d", type=int, default=3600,
+                    help='Duration to wait for experiment to finish (secs.)')
 
 args = parser.parse_args()
 
@@ -33,15 +36,24 @@ def deploy_spot_instance(config: dict) -> None:
     if args.dryrun:
         return_code, stdout, stderr = t.plan(args.terraform, var=options)
     else:
-        print(t.plan(args.terraform, var=options))
+        return_code, stdout, stderr = t.plan(args.terraform, var=options)
+        print(stdout)
+    try:
         t.apply(args.terraform,
                 skip_plan=True,
                 var=options,
                 capture_output=False,
                 **{"auto-approve": True})
 
-    print(stdout)
-    print(stderr, file=sys.stderr)
+        print(f"Waiting for {args.duration} secs. for experiment to finish")
+        time.sleep(args.duration)
+    finally:
+        # destroy resources
+        print("Destroying resources")
+        t.destroy(args.terraform,
+                  var=options,
+                  capture_output=False,
+                  **{"auto-approve": True})
 
 if __name__ == "__main__":
     config = get_config(args.file)
