@@ -4,6 +4,7 @@ import sys
 import argparse
 import yaml
 import time
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Deploy spot instance and run experiment')
 parser.add_argument('--file', '-f', type=str,
@@ -29,7 +30,7 @@ def deploy_spot_instance(config: dict) -> None:
     options = {
         "ami": "ami-012b19f1736b6aae8", # Deep Learning Base AMI (Ubuntu) Version 14.0
         "config_file": args.file,
-        "notebook": config["notebook"],
+        "notebook": "../notebooks/" + config["notebook"],
     }
     if "terraform_vars" in config: options.update(config["terraform_vars"])
 
@@ -45,15 +46,19 @@ def deploy_spot_instance(config: dict) -> None:
                 capture_output=False,
                 **{"auto-approve": True})
 
-        print(f"Waiting for {args.duration} secs. for experiment to finish")
-        time.sleep(args.duration)
+        if args.duration > 0:
+            print(f"Waiting for {args.duration} secs. for experiment to finish")
+            for i in tqdm(range(args.duration)): time.sleep(1)
     finally:
         # destroy resources
-        print("Destroying resources")
-        t.destroy(args.terraform,
-                  var=options,
-                  capture_output=False,
-                  **{"auto-approve": True})
+        if args.duration > 0:
+            print("Destroying resources")
+            t.destroy(args.terraform,
+                      var=options,
+                      capture_output=False,
+                      **{"auto-approve": True})
+        else:
+            print("Warning: Your resources will not be automatically terminated!!")
 
 if __name__ == "__main__":
     config = get_config(args.file)
