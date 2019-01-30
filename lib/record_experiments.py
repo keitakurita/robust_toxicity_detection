@@ -22,7 +22,7 @@ db = client.experiments
 collection = db.logs
 
 def record(log: dict):
-    res = collection.insert_one(log)
+    res = collection.insert_one({k: str(v) for k, v in log.items()})
     logger.info(f"Inserted results at id {res.inserted_id}")
     return res
 
