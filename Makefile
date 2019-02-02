@@ -15,5 +15,4 @@ aws:
 
 gcp:
 	# no need for pipenv
-	/opt/anaconda3/bin/conda install pip
-	/opt/anaconda3/bin/pip install -r requrirements_gcp.txt
+	/opt/anaconda3/bin/pip install -r requirements_gcp.txt
