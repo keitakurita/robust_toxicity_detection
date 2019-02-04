@@ -16,3 +16,4 @@ aws:
 gcp:
 	# no need for pipenv
 	/opt/anaconda3/bin/pip install -r requirements_gcp.txt
+	sudo /opt/anaconda3/bin/python -m spacy download en_core_web_sm
