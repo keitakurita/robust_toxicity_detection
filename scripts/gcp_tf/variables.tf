@@ -1,13 +1,25 @@
+# n1-highmem-2:  13 GB, 2 CPU, $0.0250 preemptible
+# n1-standard-4: 15 GB, 4 CPU, $0.0400 preemptible
 variable instance_type {
-  default = "t2.micro"
+  default = "n1-highmem-2"
 }
 
-variable key_name {
-  default = "cmu_cc_default"
+variable project {
+  default = "nnfornlp"
 }
 
-variable ami {
-  default = "ami-059eeca93cf09eebd"
+variable image {
+  default = "deeplearning-platform-release/pytorch-latest-cu92"
 }
 
-variable config_file {}
+variable zone {
+  default = "us-east1-b"
+}
+
+variable config_file {
+  default = "foo"
+}
+
+variable gpu_type {
+  default = "nvidia-tesla-p100"
+}

@@ -1,60 +1,58 @@
-#########################
-# Obtain spot instance  #
-#########################
-provider "gcp" {
-  region = "us-east-1"
+################################
+# Obtain preemptible instance  #
+################################
+provider "google" {
+  region      = "us-east1"
+  project     = "${var.project}"
+  credentials = "${file("~/.gcp/account.json")}"
 }
 
-resource "aws_security_group" "sg" {
-  ingress {
-    from_port = 22
-    to_port   = 22
-    protocol  = "tcp"
+resource "google_compute_firewall" "default" {
+  name    = "experiment-firewall"
+  network = "default"
 
-    cidr_blocks = [
-      "0.0.0.0/0",
-    ]
+  allow {
+    protocol = "tcp"
+    ports    = ["8888", "6000"]
   }
 
-  ingress {
-    from_port = 80
-    to_port   = 80
-    protocol  = "tcp"
-
-    cidr_blocks = [
-      "0.0.0.0/0",
-    ]
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
   }
-
-  # outbound internet access
-  # allowed: any traffic from anywhere
-  egress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-
-    cidr_blocks = [
-      "0.0.0.0/0",
-    ]
-  }
-}
-
-data "template_file" "user_data" {
-  template = "${file("./setup.sh")}"
 }
 
 resource "google_compute_instance" "experiment" {
+  name         = "experiment"
   machine_type = "${var.instance_type}"
-  zone         = "us-central1-a"
+  zone         = "${var.zone}"
 
   boot_disk {
     initialize_params {
       image = "${var.image}"
+      size  = 120
     }
   }
 
+  guest_accelerator {
+    type  = "${var.gpu_type}"
+    count = 1
+  }
+
+  network_interface {
+    network = "default"
+
+    access_config {}
+  }
+
   scheduling {
-    preemptible = true
+    preemptible       = true
+    automatic_restart = false
+  }
+
+  metadata {
+    install-nvidia-driver = true
+    sshKeys               = "gcpuser:${file("~/.ssh/id_rsa.pub")}"
   }
 
   metadata_startup_script = "${file("./setup.sh")}"
