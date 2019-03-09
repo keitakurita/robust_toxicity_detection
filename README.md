@@ -2,6 +2,9 @@
 All code comes here.
 Directory layout should be self-explanitory
 
+## Setup
+Set up the environment by running `$ pipenv install` at the root of this repo.
+
 ## Running Experiments
 
 Still ironing out a lot of bugs...
