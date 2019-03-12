@@ -1,4 +1,4 @@
-allennlp
+git+https://github.com/keitakurita/allennlp.git@develop
 dnspython
 pymongo
 papermill
