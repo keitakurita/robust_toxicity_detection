@@ -1,3 +1,6 @@
+*Source data are here:
+* https://drive.google.com/open?id=1m-_P0OcuOLrcYW-SsoXYVKOkt5ZTIllVmGJTPfDs53I
+
 * re-import the data
 egen err = group(quad)
 gen nonas=(non_ascii=="TRUE")
