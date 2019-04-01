@@ -1,0 +1,2 @@
+allennlp 30c0dbc4718f8c1ca60d6c41d20e8c7d1247d9cc
+Better_LSTM_PyTorch 552314af834e06c85a2b63fc14cb0fdd6ea8e3dd
