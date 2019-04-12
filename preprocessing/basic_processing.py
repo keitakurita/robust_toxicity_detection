@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 """
 Perform basic text transformation
 
-Replace real URL by “url” token (because some texts have nothing but urls)
+Replace real URL by 'url' token (because some texts have nothing but urls)
 Tokenize using the SpaCy model
 Lower casing
 Remove repeated symbols
@@ -31,22 +32,41 @@ from allennlp.data.vocabulary import Vocabulary
 MAX_SEQ_LEN = 512
 
 import spacy
-nlp = spacy.load("en_core_web_sm",disable=['parser', 'ner'])
 
+class SpacyTokenizer:
 
-def replace_url(s):
-  return re.sub(r"http\S+", "url", s)
+  def __init__(self):
+    self.pat_part = re.compile(r'^[a-z]{0,2}\'[a-z]{1,2}$', flags=re.IGNORECASE)
+    self.spacy_nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner', 'pos'])
 
+  def replace_url(s):
+    return re.sub(r"http\S+", "url", s)
+
+  def __call__(self, text):
+    toks1 = [token.text for token in self.spacy_nlp(SpacyTokenizer.replace_url(text))]
+
+    toks2 = []
+
+    for i in range(len(toks1)):
+      s = toks1[i]
+      if i > 0 and self.pat_part.match(s) is not None:
+        arr = s.split("'")
+        toks2[-1] += arr[0]
+        toks2.append("'")
+        toks2.append(arr[1])
+      else:
+        toks2.append(s)
+
+    return toks2
+
+tok_obj = SpacyTokenizer()
+
+def tokenizer(x: str):
+  return tok_obj(x)
 
 def remove_extra_chars(s, max_qty=2):
   res = [c * min(max_qty, len(list(group_iter))) for c, group_iter in groupby(s)]
   return ''.join(res)
-
-#TODO: clean up problematic substitutions by spaCy (e.g. "n't" that confuse BERT)
-def tokenizer(x: str):
-  doc = nlp(replace_url(x))
-  toks = [token.text for token in doc]
-  return toks
 
 alphabet = set(string.ascii_lowercase)
 
@@ -90,9 +110,9 @@ class JigsawDatasetTransformer(DatasetReader):
 
   @overrides
   def text_to_instance(self, tokens: List[str], id: str,
-                       labels: np.ndarray) -> Instance:
+                       labels: np.ndarray, text: str) -> Instance:
 
-    fields = {"id" : id}
+    fields = {}
 
     sentence_field = MemoryOptimizedTextField([proc(x) for x in tokens],
                                               self.token_indexers)
@@ -106,6 +126,10 @@ class JigsawDatasetTransformer(DatasetReader):
 
     label_field = ArrayField(array=labels)
     fields["label"] = label_field
+
+    fields["text"] =  text
+
+    fields["id"] = id
 
     return Instance(fields)
 
@@ -123,20 +147,31 @@ class JigsawDatasetTransformer(DatasetReader):
           raise ValueError(f"line has {len(line)} values")
         yield self.text_to_instance(
           self.tokenizer(text),
-          id_, np.array([int(x) for x in labels]),
+          id_, np.array([int(x) for x in labels]), text 
         )
 
-  def save_to_file(self, file_path: str) -> None:
+  @staticmethod
+  def to_int_list(arr):
+    if len(arr.shape) == 1:
+      return [int(x) for x in arr]
+    elif len(arr.shape) == 2:
+      return [ [int(x) for x in e] for e in arr]
 
-    for i, instance in enumerate(self):
+  @staticmethod
+  def save_to_file(data, file_path: str) -> None:
+
+    for _, instance in enumerate(data):
 
       with open(file_path, 'w') as tf:
 
+        #print(type(instance.get("labels")))
+
         obj = {"id": instance.get("id"),
-               "labels" : instance.get("labels").array,
-               "tokens": instance.get("tokens").tokens,
-               "word_level_features" : instance.get("word_level_features").array,
-               "sentence_level_features": instance.get("sentence_level_features").array
+               "label" : JigsawDatasetTransformer.to_int_list(instance.get("label").array),
+               "tokens": list(instance.get("tokens").tokens),
+               "word_level_features" : JigsawDatasetTransformer.to_int_list(instance.get("word_level_features").array),
+               "sentence_level_features": JigsawDatasetTransformer.to_int_list(instance.get("sentence_level_features").array),
+               "text" : instance.get("text")
               }
 
         objStr = json.dumps(obj)
@@ -190,8 +225,8 @@ def main(argv):
   test_ds = transformer.read(os.path.join(args.datapath,args.rawtest))
   full_ds = train_ds + test_ds
 
-  train_ds.save_to_file(os.path.join(args.datapath, args.proctrain))
-  test_ds.save_to_file(os.path.join(args.datapath, args.proctest))
+  transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain))
+  transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest))
 
   vocab = Vocabulary.from_instances(full_ds)
   vocab.save_to_files(os.path.join(args.datapath, args.vocabname))
