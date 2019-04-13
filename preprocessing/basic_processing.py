@@ -179,15 +179,10 @@ class JigsawDatasetTransformer(DatasetReader):
     label_field = ArrayField(array=labels)
     fields["label"] = label_field
 
-<<<<<<< HEAD
     fields["text"] =  MetadataField(text)
 
     fields["id"] = MetadataField(id)
-=======
-    fields["text"] =  text
 
-    fields["id"] = id
->>>>>>> 05ec77328eed9ee1ec99d5f9cce8aa9d956317b0
 
     return Instance(fields)
 
@@ -208,8 +203,6 @@ class JigsawDatasetTransformer(DatasetReader):
           id_, np.array([int(x) for x in labels]), text 
         )
 
-<<<<<<< HEAD
-
   @staticmethod
   def to_int_list(arr):
     if len(arr.shape) == 1:
@@ -226,41 +219,17 @@ class JigsawDatasetTransformer(DatasetReader):
 
   @staticmethod
   def save_to_file(data, file_path: str) -> None:
-=======
-  @staticmethod
-  def to_int_list(arr):
-    if len(arr.shape) == 1:
-      return [int(x) for x in arr]
-    elif len(arr.shape) == 2:
-      return [ [int(x) for x in e] for e in arr]
-
-  @staticmethod
-  def save_to_file(data, file_path: str) -> None:
-
-    for _, instance in enumerate(data):
->>>>>>> 05ec77328eed9ee1ec99d5f9cce8aa9d956317b0
 
     with open(file_path, 'w') as tf:
       for _, instance in enumerate(data):
 
-<<<<<<< HEAD
         obj = {"id": instance.get("id").metadata,
                "label" : JigsawDatasetTransformer.to_int_list(instance.get("label").array),
                "tokens": list(instance.get("tokens").tokens),
                "word_level_features" : JigsawDatasetTransformer.to_float_list(instance.get("word_level_features").array),
                "sentence_level_features": JigsawDatasetTransformer.to_float_list(instance.get("sentence_level_features").array),
                "text" : instance.get("text").metadata                  }
-=======
-        #print(type(instance.get("labels")))
 
-        obj = {"id": instance.get("id"),
-               "label" : JigsawDatasetTransformer.to_int_list(instance.get("label").array),
-               "tokens": list(instance.get("tokens").tokens),
-               "word_level_features" : JigsawDatasetTransformer.to_int_list(instance.get("word_level_features").array),
-               "sentence_level_features": JigsawDatasetTransformer.to_int_list(instance.get("sentence_level_features").array),
-               "text" : instance.get("text")
-              }
->>>>>>> 05ec77328eed9ee1ec99d5f9cce8aa9d956317b0
 
         objStr = json.dumps(obj)
         tf.write(objStr + '\n')
