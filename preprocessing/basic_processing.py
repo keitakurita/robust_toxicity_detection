@@ -127,7 +127,7 @@ class TokenTransfomer:
 
   def __init__(self, nlp):
 
-    self.case_mape_dict = get_canon_case_map(nlp)
+    self.case_map_dict = get_canon_case_map(nlp)
 
 
   def proc(self, s: str) -> str:
@@ -140,7 +140,7 @@ class TokenTransfomer:
         x = x.upper()
       # If the first letter is upper-cased, we want to preserve this too
       elif s[0] != s[0].lower():
-        x[0] = x[0].upper()
+        x = x[0].upper() + x[1:]
 
       return x
 
