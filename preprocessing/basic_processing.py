@@ -69,8 +69,11 @@ class SpacyTokenizer:
   def replace_url(s):
     return re.sub(r"http\S+", "url", s)
 
+  def get_spacy(self):
+    return self.spacy_nlp
+
   def __call__(self, text):
-    toks1 = [token.text for token in self.spacy_nlp(SpacyTokenizer.replace_url(text))]
+    toks1 = [token.text for token in self.spacy_nlp(SpacyTokenizer.replace_url(text)) if token.text.strip() != '']
 
     toks2 = []
 
@@ -274,6 +277,7 @@ def main(argv):
   )
 
   transformer = JigsawDatasetTransformer(
+    tok_transf = TokenTransfomer(tok_obj.get_spacy()),
     tokenizer=tokenizer,
     token_indexers={"tokens": token_indexer}
   )
@@ -290,8 +294,10 @@ def main(argv):
 
   ft_model = fastText.load_model(os.path.join(args.datapath, "wiki.en.bin"))
   ft_emb = []
+
+
   with open(os.path.join(args.datapath, args.ftmatname+".txt"),"wt") as f:
-    for idx, token in vocab.get_index_to_token_vocabulary().items():
+    for _, token in vocab.get_index_to_token_vocabulary().items():
       emb = ft_model.get_word_vector(token)
       emb_as_str = " ".join(["%.4f" % x for x in emb])
       ft_emb.append(np.array(emb))
