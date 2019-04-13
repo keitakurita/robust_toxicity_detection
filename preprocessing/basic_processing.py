@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
 """
 Perform basic text transformation
 
-Replace real URL by “url” token (because some texts have nothing but urls)
+Replace real URL by 'url' token (because some texts have nothing but urls)
 Tokenize using the SpaCy model
 Lower casing
 Remove repeated symbols
@@ -21,32 +22,78 @@ from itertools import groupby
 import json
 from typing import *
 from overrides import overrides
-from allennlp.data import Instance
+from allennlp.data import Instance, Token
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
 from allennlp.data.dataset_readers import DatasetReader
-from allennlp.data.fields import TextField, ArrayField
+from allennlp.data.fields import TextField, ArrayField, MetadataField
 import csv
 from allennlp.data.vocabulary import Vocabulary
 
 MAX_SEQ_LEN = 512
 
+TokenList = List[Token]
+
+#NOTE spaCy version 2.0.18
 import spacy
-nlp = spacy.load("en_core_web_sm",disable=['parser', 'ner'])
+
+def count_lowercase(s):
+  return sum([int(c == c.lower()) for c in s])
 
 
-def replace_url(s):
-  return re.sub(r"http\S+", "url", s)
+def get_canon_case_map(nlp):
+  dict_tmp = dict()
 
+  for t in nlp.vocab:
+    dict_tmp[t.text.lower()] = set()
+
+  for t in nlp.vocab:
+    dict_tmp[t.text.lower()].add(t.text)
+
+  dict_map = dict()
+
+  for key, tset in dict_tmp.items():
+    lst = [(count_lowercase(s), s) for s in tset]
+    lst.sort(reverse=True)
+    choice_str = lst[0][1]
+    dict_map[key] = choice_str
+
+  return dict_map
+
+
+class SpacyTokenizer:
+
+  def __init__(self):
+    self.pat_part = re.compile(r'^[a-z]{0,2}\'[a-z]{1,2}$', flags=re.IGNORECASE)
+    self.spacy_nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner', 'pos'])
+
+  def replace_url(s):
+    return re.sub(r"http\S+", "url", s)
+
+  def __call__(self, text):
+    toks1 = [token.text for token in self.spacy_nlp(SpacyTokenizer.replace_url(text))]
+
+    toks2 = []
+
+    for i in range(len(toks1)):
+      s = toks1[i]
+      if i > 0 and self.pat_part.match(s) is not None:
+        arr = s.split("'")
+        toks2[-1] += arr[0]
+        toks2.append("'")
+        toks2.append(arr[1])
+      else:
+        toks2.append(s)
+
+    return toks2
+
+tok_obj = SpacyTokenizer()
+
+def tokenizer(x: str):
+  return tok_obj(x)
 
 def remove_extra_chars(s, max_qty=2):
   res = [c * min(max_qty, len(list(group_iter))) for c, group_iter in groupby(s)]
   return ''.join(res)
-
-#TODO: clean up problematic substitutions by spaCy (e.g. "n't" that confuse BERT)
-def tokenizer(x: str):
-  doc = nlp(replace_url(x))
-  toks = [token.text for token in doc]
-  return toks
 
 alphabet = set(string.ascii_lowercase)
 
@@ -55,13 +102,11 @@ sentence_level_features: List[Callable[[List[str]], float]] = [
 ]
 
 word_level_features: List[Callable[[str], float]] = [
-    lambda x: 1 if (x.lower() == x) else 0,
+    lambda x: len([c for c in x if c.lower() != c]) / len(x),
     lambda x: len([c for c in x.lower() if c not in alphabet]) / len(x),
     lambda x: 1 if (remove_extra_chars(x.lower()) == x.lower()) else 0
 ]
 
-def proc(x: str) -> str:
-    return remove_extra_chars(x.lower())
 
 class MemoryOptimizedTextField(TextField):
 
@@ -78,24 +123,51 @@ class MemoryOptimizedTextField(TextField):
         super().index(vocab)
         self.tokens = None # empty tokens
 
+class TokenTransfomer:
+
+  def __init__(self, nlp):
+
+    self.case_mape_dict = get_canon_case_map(nlp)
+
+
+  def proc(self, s: str) -> str:
+    x = remove_extra_chars(s.lower())
+    if x in self.case_map_dict:
+      # Get a canonical case version
+      x = self.case_map_dict[x]
+      # If the word is all capital, we want to preserve all upper case
+      if s == s.upper():
+        x = x.upper()
+      # If the first letter is upper-cased, we want to preserve this too
+      elif s[0] != s[0].lower():
+        x[0] = x[0].upper()
+
+      return x
+
+    return remove_extra_chars(s)
+
+
 class JigsawDatasetTransformer(DatasetReader):
 
-  def __init__(self, tokenizer: Callable[[str], List[str]] = lambda x: x.split(),
-               token_indexers: Dict[str, TokenIndexer] = None,  # TODO: Handle mapping from BERT
+  def __init__(self,
+               tok_transf: TokenTransfomer,
+               tokenizer: Callable[[str], List[str]] = lambda x: x.split(),
+               token_indexers: Dict[str, TokenIndexer] = None, 
                max_seq_len: Optional[int] = MAX_SEQ_LEN) -> None:
     super().__init__(lazy=False)
     self.tokenizer = tokenizer
+    self.tok_transf = tok_transf
     self.token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
     self.max_seq_len = max_seq_len
 
   @overrides
   def text_to_instance(self, tokens: List[str], id: str,
-                       labels: np.ndarray) -> Instance:
+                       labels: np.ndarray, text: str) -> Instance:
 
-    fields = {"id" : id}
+    fields = {}
 
-    sentence_field = MemoryOptimizedTextField([proc(x) for x in tokens],
-                                              self.token_indexers)
+    sentence_field = MemoryOptimizedTextField([self.tok_transf.proc(x) for x in tokens],
+                                               self.token_indexers)
     fields["tokens"] = sentence_field
 
     wl_feats = np.array([[func(w) for func in word_level_features] for w in tokens])
@@ -106,6 +178,10 @@ class JigsawDatasetTransformer(DatasetReader):
 
     label_field = ArrayField(array=labels)
     fields["label"] = label_field
+
+    fields["text"] =  MetadataField(text)
+
+    fields["id"] = MetadataField(id)
 
     return Instance(fields)
 
@@ -123,21 +199,36 @@ class JigsawDatasetTransformer(DatasetReader):
           raise ValueError(f"line has {len(line)} values")
         yield self.text_to_instance(
           self.tokenizer(text),
-          id_, np.array([int(x) for x in labels]),
+          id_, np.array([int(x) for x in labels]), text 
         )
 
-  def save_to_file(self, file_path: str) -> None:
 
-    for i, instance in enumerate(self):
+  @staticmethod
+  def to_int_list(arr):
+    if len(arr.shape) == 1:
+      return [int(x) for x in arr]
+    elif len(arr.shape) == 2:
+      return [ [int(x) for x in e] for e in arr]
 
-      with open(file_path, 'w') as tf:
+  @staticmethod
+  def to_float_list(arr):
+    if len(arr.shape) == 1:
+      return [float(x) for x in arr]
+    elif len(arr.shape) == 2:
+      return [ [float(x) for x in e] for e in arr]
 
-        obj = {"id": instance.get("id"),
-               "labels" : instance.get("labels").array,
-               "tokens": instance.get("tokens").tokens,
-               "word_level_features" : instance.get("word_level_features").array,
-               "sentence_level_features": instance.get("sentence_level_features").array
-              }
+  @staticmethod
+  def save_to_file(data, file_path: str) -> None:
+
+    with open(file_path, 'w') as tf:
+      for _, instance in enumerate(data):
+
+        obj = {"id": instance.get("id").metadata,
+               "label" : JigsawDatasetTransformer.to_int_list(instance.get("label").array),
+               "tokens": list(instance.get("tokens").tokens),
+               "word_level_features" : JigsawDatasetTransformer.to_float_list(instance.get("word_level_features").array),
+               "sentence_level_features": JigsawDatasetTransformer.to_float_list(instance.get("sentence_level_features").array),
+               "text" : instance.get("text").metadata                  }
 
         objStr = json.dumps(obj)
         tf.write(objStr + '\n')
@@ -190,15 +281,15 @@ def main(argv):
   test_ds = transformer.read(os.path.join(args.datapath,args.rawtest))
   full_ds = train_ds + test_ds
 
-  train_ds.save_to_file(os.path.join(args.datapath, args.proctrain))
-  test_ds.save_to_file(os.path.join(args.datapath, args.proctest))
+  transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain))
+  transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest))
 
   vocab = Vocabulary.from_instances(full_ds)
   vocab.save_to_files(os.path.join(args.datapath, args.vocabname))
 
   ft_model = fastText.load_model(os.path.join(args.datapath, "wiki.en.bin"))
   ft_emb = []
-  with (os.path.join(args.datapath, args.ftmatname+".txt")).open("wt") as f:
+  with open(os.path.join(args.datapath, args.ftmatname+".txt"),"wt") as f:
     for idx, token in vocab.get_index_to_token_vocabulary().items():
       emb = ft_model.get_word_vector(token)
       emb_as_str = " ".join(["%.4f" % x for x in emb])
