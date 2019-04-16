@@ -4,7 +4,7 @@ Perform basic text transformation
 
 Replace real URL by 'url' token (because some texts have nothing but urls)
 Tokenize using the SpaCy model
-Lower casing
+Preserve casing
 Remove repeated symbols
 Obtain FastText embeddings for tokens
 
@@ -15,50 +15,22 @@ NOTE: The process assumes that id is col0, comment text is col1
 import os, sys
 import string
 import argparse
-import numpy as np
 import fastText
 import re
 from itertools import groupby
 import json
-from typing import *
-from overrides import overrides
-from allennlp.data import Instance, Token
-from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
+from allennlp.data import Instance
+from allennlp.data.token_indexers import SingleIdTokenIndexer
 from allennlp.data.dataset_readers import DatasetReader
-from allennlp.data.fields import TextField, ArrayField, MetadataField
+from allennlp.data.fields import  ArrayField, MetadataField
 import csv
 from allennlp.data.vocabulary import Vocabulary
-
-MAX_SEQ_LEN = 512
-
-TokenList = List[Token]
-
-#NOTE spaCy version 2.0.18
+#from preprocessing.preprocessing_common import *
+from preprocessing_common import *
 import spacy
 
-def count_lowercase(s):
-  return sum([int(c == c.lower()) for c in s])
-
-
-def get_canon_case_map(nlp):
-  dict_tmp = dict()
-
-  for t in nlp.vocab:
-    dict_tmp[t.text.lower()] = set()
-
-  for t in nlp.vocab:
-    dict_tmp[t.text.lower()].add(t.text)
-
-  dict_map = dict()
-
-  for key, tset in dict_tmp.items():
-    lst = [(count_lowercase(s), s) for s in tset]
-    lst.sort(reverse=True)
-    choice_str = lst[0][1]
-    dict_map[key] = choice_str
-
-  return dict_map
-
+from typing import *
+from overrides import overrides
 
 class SpacyTokenizer:
 
@@ -69,11 +41,8 @@ class SpacyTokenizer:
   def replace_url(s):
     return re.sub(r"http\S+", "url", s)
 
-  def get_spacy(self):
-    return self.spacy_nlp
-
   def __call__(self, text):
-    toks1 = [token.text for token in self.spacy_nlp(SpacyTokenizer.replace_url(text)) if token.text.strip() != '']
+    toks1 = [token.text for token in self.spacy_nlp(SpacyTokenizer.replace_url(text))]
 
     toks2 = []
 
@@ -111,20 +80,6 @@ word_level_features: List[Callable[[str], float]] = [
 ]
 
 
-class MemoryOptimizedTextField(TextField):
-
-    @overrides
-    def __init__(self, tokens: List[str], token_indexers: Dict[str, TokenIndexer]) -> None:
-        self.tokens = tokens
-        self._token_indexers = token_indexers
-        self._indexed_tokens: Optional[Dict[str, TokenList]] = None
-        self._indexer_name_to_indexed_token: Optional[Dict[str, List[str]]] = None
-        # skip checks for tokens
-
-    @overrides
-    def index(self, vocab):
-        super().index(vocab)
-        self.tokens = None # empty tokens
 
 class TokenTransfomer:
 
@@ -277,7 +232,6 @@ def main(argv):
   )
 
   transformer = JigsawDatasetTransformer(
-    tok_transf = TokenTransfomer(tok_obj.get_spacy()),
     tokenizer=tokenizer,
     token_indexers={"tokens": token_indexer}
   )
@@ -294,10 +248,8 @@ def main(argv):
 
   ft_model = fastText.load_model(os.path.join(args.datapath, "wiki.en.bin"))
   ft_emb = []
-
-
   with open(os.path.join(args.datapath, args.ftmatname+".txt"),"wt") as f:
-    for _, token in vocab.get_index_to_token_vocabulary().items():
+    for idx, token in vocab.get_index_to_token_vocabulary().items():
       emb = ft_model.get_word_vector(token)
       emb_as_str = " ".join(["%.4f" % x for x in emb])
       ft_emb.append(np.array(emb))
