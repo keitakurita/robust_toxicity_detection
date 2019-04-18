@@ -6,13 +6,17 @@ from allennlp.data.fields import TextField
 from allennlp.data.token_indexers import TokenIndexer
 from typing import *
 from overrides import overrides
-from allennlp.data import  Token
+from allennlp.data import  Token, Instance
+from allennlp.data.fields import  MetadataField
+from allennlp.data.token_indexers import SingleIdTokenIndexer
 
 JIGSAW_LABEL_NAMES = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
 
 MAX_SEQ_LEN = 512
 
 NON_WORDS = ['@@UNKNOWN@@', '@@PADDING@@']
+
+SPACY_MODEL_TYPE = "en_core_web_sm"
 
 TokenList = List[Token]
 
@@ -32,6 +36,9 @@ class MemoryOptimizedTextField(TextField):
     super().index(vocab)
     self.tokens = None  # empty tokens
 
+
+def has_newline(s):
+  return s.find('\n') >=0
 
 def count_lowercase(s):
   return sum([int(c == c.lower()) for c in s])
@@ -57,12 +64,26 @@ def get_canon_case_map(nlp):
   return dict_map
 
 
+def get_spacy_vocab_instances(nlp) -> Iterator[Instance]:
+  words = set([t.text.lower().strip() for t in nlp.vocab])
+
+  fields = {}
+
+  for w in words:
+    w = w.strip()
+    if w and w.find('\n') < 0:
+      fields["tokens"] = MemoryOptimizedTextField([w], {"tokens": SingleIdTokenIndexer()})
+      yield Instance(fields)
+
+
 def read_embeds_and_words_subset(file_name, word_map):
   word_list, embed_list = [], []
 
   with open(file_name, encoding="utf8") as f:
     for line in f:
       line = line.strip()
+      if not line:
+        continue
       fld = line.split()
       w = fld[0]
       if w in word_map:
@@ -72,8 +93,8 @@ def read_embeds_and_words_subset(file_name, word_map):
   return word_list, np.vstack(embed_list)
 
 
-def create_embeds_index(embeds, M = 30, efC = 200, efS = 200):
-  num_threads = 0
+def create_embed_index(embeds, num_threads = 0, M = 30, efC = 200):
+
   index_time_params = {'M': M, 'indexThreadQty': num_threads, 'efConstruction': efC, 'post': 0}
   print('Index-time parameters', index_time_params)
 
@@ -93,16 +114,10 @@ def create_embeds_index(embeds, M = 30, efC = 200, efS = 200):
   print('Index-time parameters', index_time_params)
   print('Indexing time = %f' % (end - start))
 
-  # Setting query-time parameters
-  query_time_params = {'efSearch': efS}
-  print('Setting query-time parameters', query_time_params)
-  index.setQueryTimeParams(query_time_params)
-
   return index
 
 
-def create_word_index(words, M = 30, efC = 200, efS = 200):
-  num_threads = 0
+def create_word_index(words, num_threads = 0, M = 30, efC = 200):
   index_time_params = {'M': M, 'indexThreadQty': num_threads, 'efConstruction': efC, 'post': 0}
   print('Index-time parameters', index_time_params)
 
@@ -122,9 +137,22 @@ def create_word_index(words, M = 30, efC = 200, efS = 200):
   print('Index-time parameters', index_time_params)
   print('Indexing time = %f' % (end - start))
 
-  # Setting query-time parameters
+
+  return index
+
+def query_index(index, K, query_arr, num_threads=0, efS=200):
+  # Querying
   query_time_params = {'efSearch': efS}
   print('Setting query-time parameters', query_time_params)
   index.setQueryTimeParams(query_time_params)
 
-  return index
+  query_qty = len(query_arr)
+  start = time.time()
+  res = index.knnQueryBatch(query_arr, k=K, num_threads=num_threads)
+  end = time.time()
+  print('kNN time total=%f (sec), per query=%f (sec), per query adjusted for thread number=%f (sec)' %
+        (end - start, float(end - start) / query_qty, num_threads * float(end - start) / query_qty))
+
+  return res
+
+

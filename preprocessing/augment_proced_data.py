@@ -71,7 +71,7 @@ def main(argv):
   infile = open(os.path.join(args.datapath,args.infile),"r")
   outfile = open(os.path.join(args.datapath,args.outfile),"w")
 
-  spacy_nlp = spacy.load("en_core_web_sm",
+  spacy_nlp = spacy.load(SPACY_MODEL_TYPE,
                          disable=['parser', 'ner', 'pos'])
 
   spacy_word_map = get_canon_case_map(spacy_nlp)
@@ -80,9 +80,12 @@ def main(argv):
     word_arr, embed_arr = read_embeds_and_words_subset(os.path.join(args.datapath,args.ftmatname), spacy_word_map)
     print('Read %d spacy words from the fasttext-dictionary file' % len(word_arr))
 
-  embed_index = create_embeds_index(embed_arr)
 
+
+  embed_index = create_embed_index(embed_arr)
   word_index = create_word_index(word_arr)
+
+  word_to_embed_map = { word_arr[i] : embed_arr[i] for i in range(len(word_arr)) }
 
   with timer("Augmenting data"):
 

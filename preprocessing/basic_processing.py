@@ -32,11 +32,12 @@ import spacy
 from typing import *
 from overrides import overrides
 
+
 class SpacyTokenizer:
 
-  def __init__(self):
+  def __init__(self, spacy_nlp):
     self.pat_part = re.compile(r'^[a-z]{0,2}\'[a-z]{1,2}$', flags=re.IGNORECASE)
-    self.spacy_nlp = spacy.load("en_core_web_sm", disable=['parser', 'ner', 'pos'])
+    self.spacy_nlp = spacy_nlp
 
   def replace_url(s):
     return re.sub(r"http\S+", "url", s)
@@ -58,7 +59,9 @@ class SpacyTokenizer:
 
     return toks2
 
-tok_obj = SpacyTokenizer()
+
+spacy_nlp = spacy.load(SPACY_MODEL_TYPE, disable=['parser', 'ner', 'pos'])
+tok_obj = SpacyTokenizer(spacy_nlp)
 
 def tokenizer(x: str):
   return tok_obj(x)
@@ -103,6 +106,8 @@ class TokenTransfomer:
       return x
 
     return remove_extra_chars(s)
+
+
 
 
 class JigsawDatasetTransformer(DatasetReader):
@@ -156,6 +161,7 @@ class JigsawDatasetTransformer(DatasetReader):
           id_, text, *labels = line
         else:
           raise ValueError(f"line has {len(line)} values")
+        text = text.replace('\n', ' ').replace('\r', ' ')
         yield self.text_to_instance(
           self.tokenizer(text),
           id_, np.array([int(x) for x in labels]), text 
@@ -227,11 +233,15 @@ def main(argv):
   args = parser.parse_args(argv)
   print(args)
 
+  vocab = Vocabulary.from_instances(get_spacy_vocab_instances(spacy_nlp))
+  print('Spacy vocabulary:', vocab)
+
   token_indexer = SingleIdTokenIndexer(
     lowercase_tokens=True,
   )
 
   transformer = JigsawDatasetTransformer(
+    TokenTransfomer(tok_obj.spacy_nlp),
     tokenizer=tokenizer,
     token_indexers={"tokens": token_indexer}
   )
@@ -243,20 +253,16 @@ def main(argv):
   transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain))
   transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest))
 
-  vocab = Vocabulary.from_instances(full_ds)
+  vocab.extend_from_instances(full_ds)
   vocab.save_to_files(os.path.join(args.datapath, args.vocabname))
 
   ft_model = fastText.load_model(os.path.join(args.datapath, "wiki.en.bin"))
-  ft_emb = []
+
   with open(os.path.join(args.datapath, args.ftmatname+".txt"),"wt") as f:
     for idx, token in vocab.get_index_to_token_vocabulary().items():
       emb = ft_model.get_word_vector(token)
       emb_as_str = " ".join(["%.4f" % x for x in emb])
-      ft_emb.append(np.array(emb))
       f.write(f"{token} {emb_as_str}\n")
-
-  ft_emb = np.vstack(ft_emb)
-  np.save(os.path.join(args.datapath,  args.ftmatname+".npy"), ft_emb)
 
 if __name__ == '__main__':
   main(sys.argv[1:])
