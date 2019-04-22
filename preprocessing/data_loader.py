@@ -8,55 +8,129 @@ sentence level features
 word substitutions if as available
 metadata (id, raw text)
 
-optionally serializes the data
-
 """
 
+
 import os, sys
-import string
-import numpy as np
+sys.path.append('.')
+
+import argparse
 import json
-from typing import *
-from overrides import overrides
-from allennlp.data import Instance, Token
+
+import numpy as np
+
+from allennlp.data import Instance
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
 from allennlp.data.dataset_readers import DatasetReader
-from allennlp.data.fields import TextField, ArrayField, MetadataField
+from allennlp.data.fields import ArrayField, MetadataField
 
-from basic_processing import MAX_SEQ_LEN, MemoryOptimizedTextField
+from preprocessing_common import *
 
-from allennlp.training import TrainerWithCallbacks
+from typing import *
+from overrides import overrides
 
-class JigsawDatasetJSONReader(DatasetReader):
+def dummy_token_extender(toks):
+  return toks
 
-  def __init__(self, tokenizer: Callable[[str], List[str]] = lambda x: x.split(),
+reader_registry = {}
+
+def register(name: str):
+  def dec(x: Callable):
+    reader_registry[name] = x
+    return x
+
+  return dec
+
+class OOVTokenSwapper:
+
+  def __init__(self,
+               global_weight = 0.5,
+               context_weight = 0.25,
+               surface_weight = 0.25):
+    self.gw = global_weight
+    self.cw = context_weight
+    self.sw = surface_weight
+
+  def _get_token(self,oov_token, candidates):
+
+    max_score = 0
+    swap_token = oov_token
+    for c in candidates:
+      global_score, context_score, surface_score = candidates[c]
+      score =  self.gw * global_score + \
+               self.cw * context_score + \
+               self.sw * surface_score
+      if score > max_score:
+        max_score = score
+        swap_token = c
+
+    return swap_token
+
+  def _find_token_pos(self,
+                      oov_token=str,
+                      tokens=List[str]
+                      ) -> List:
+
+    return [i for i in range(len(tokens)) if tokens[i] == oov_token]
+
+  def swap(self,
+           tokens: List[str],
+           oov_tokens:  Dict[str, Dict[str, List[float]]] = None) -> List[str]:
+
+     if oov_tokens is None:
+       pass
+
+     if self.gw == 0 and self.cw == 0 and self.sw == 0:
+       pass
+
+     for oov in oov_tokens:
+       pos = self._find_token_pos(oov,tokens)
+       swap = self._get_token(oov,oov_tokens[oov])
+       tokens[pos] = swap
+
+@register("jigsaw")
+class JigsawDatasetJSONLReader(DatasetReader):
+
+  def __init__(self,
+               token_extender : Callable[[str], List[str]],
+               oov_token_swapper: OOVTokenSwapper,
+               testing: bool = False,
                token_indexers: Dict[str, TokenIndexer] = None,
                max_seq_len: Optional[int] = MAX_SEQ_LEN) -> None:
     super().__init__(lazy=False)
-    self.tokenizer = tokenizer
+    self.token_extender = token_extender
     self.token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
+    self.oov_token_swapper = oov_token_swapper
     self.max_seq_len = max_seq_len
+    self.testing = testing
 
   @overrides
-  def text_to_instance(self, tokens: List[str], id: str,
-                       labels: np.ndarray, text: str) -> Instance:
+  def text_to_instance(self, tokens: List[str],
+                       wl_feats: List[float],
+                       sl_feats: List[float],
+                       labels: List[int],
+                       id: str,
+                       oov: Dict[str, Dict[str, List[float]]] = None) -> Instance:
 
     fields = {}
 
-    sentence_field = MemoryOptimizedTextField([proc(x) for x in tokens],
-                                              self.token_indexers)
+    if oov is None:
+
+      sentence_field = MemoryOptimizedTextField(self.token_extender(tokens), self.token_indexers)
+
+    else:
+
+      sentence_field = MemoryOptimizedTextField(self.token_extender(self.oov_token_swapper.swap(tokens,oov)),
+                                                self.token_indexers)
+
     fields["tokens"] = sentence_field
 
-    wl_feats = np.array([[func(w) for func in word_level_features] for w in tokens])
-    fields["word_level_features"] = ArrayField(array=wl_feats)
+    fields["word_level_features"] = ArrayField(array=np.array(wl_feats))
 
-    sl_feats = np.array([func(tokens) for func in sentence_level_features])
-    fields["sentence_level_features"] = ArrayField(array=sl_feats)
+    fields["sentence_level_features"] = ArrayField(array=np.array(sl_feats))
 
-    label_field = ArrayField(array=labels)
+    label_field = ArrayField(array=np.array(labels))
     fields["label"] = label_field
-
-    fields["text"] =  MetadataField(text)
 
     fields["id"] = MetadataField(id)
 
@@ -64,47 +138,59 @@ class JigsawDatasetJSONReader(DatasetReader):
 
   @overrides
   def _read(self, file_path: str) -> Iterator[Instance]:
+
     with open(file_path) as f:
-      reader = csv.reader(f)
-      next(reader)
-      for i, line in enumerate(reader):
-        if len(line) == 9:
-          _, id_, text, *labels = line
-        elif len(line) == 8:
-          id_, text, *labels = line
+
+      for i, line in enumerate(f):
+
+        data = json.loads(line)
+
+        if "oov" in data:
+          oov_data = data["oov"]
         else:
-          raise ValueError(f"line has {len(line)} values")
+          oov_data = None
+
         yield self.text_to_instance(
-          self.tokenizer(text),
-          id_, np.array([int(x) for x in labels]), text
-        )
+            data["tokens"],
+            data["word_level_features"],
+            data["sentence_level_features"],
+            data["label"],
+            data["id"],
+            oov_data
+            )
 
-  @staticmethod
-  def to_int_list(arr):
-    if len(arr.shape) == 1:
-      return [int(x) for x in arr]
-    elif len(arr.shape) == 2:
-      return [ [int(x) for x in e] for e in arr]
+        if self.testing and i == 1000: break
 
-  @staticmethod
-  def to_float_list(arr):
-    if len(arr.shape) == 1:
-      return [float(x) for x in arr]
-    elif len(arr.shape) == 2:
-      return [ [float(x) for x in e] for e in arr]
 
-  @staticmethod
-  def save_to_file(data, file_path: str) -> None:
+def main(argv):
 
-    with open(file_path, 'w') as tf:
-      for _, instance in enumerate(data):
+  parser = argparse.ArgumentParser(description='Data loader')
+  parser.add_argument('--datapath', type=str,
+                      required=False,
+                      default = '',
+                      help = '../data/jigsaw/')
+  parser.add_argument('--infile', type=str,
+                      required = True,
+                      default = 'train_basic.jsonl',
+                      help = 'Input file that underwent processing')
 
-        obj = {"id": instance.get("id").metadata,
-               "label" : JigsawDatasetJSONReader.to_int_list(instance.get("label").array),
-               "tokens": list(instance.get("tokens").tokens),
-               "word_level_features" : JigsawDatasetJSONReader.to_float_list(instance.get("word_level_features").array),
-               "sentence_level_features": JigsawDatasetJSONReader.to_float_list(instance.get("sentence_level_features").array),
-               "text" : instance.get("text").metadata                  }
 
-        objStr = json.dumps(obj)
-        tf.write(objStr + '\n')
+  args = parser.parse_args(argv)
+  print(args)
+
+  token_indexer = SingleIdTokenIndexer(
+    lowercase_tokens=True,
+  )
+
+  reader = JigsawDatasetJSONLReader(
+    token_extender = dummy_token_extender,
+    oov_token_swapper = OOVTokenSwapper(),
+    token_indexers={"tokens": token_indexer}
+  )
+
+  ds = reader.read(os.path.join(args.datapath,args.infile))
+  print(len(ds))
+  print(vars(ds[0]))
+
+if __name__ == '__main__':
+  main(sys.argv[1:])
