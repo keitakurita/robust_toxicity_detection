@@ -31,7 +31,7 @@ import spacy
 from typing import *
 from overrides import overrides
 from itertools import chain
-
+import numpy as np
 
 class SpacyTokenizer:
 
@@ -62,7 +62,6 @@ class SpacyTokenizer:
 
     return toks2
 
-
 spacy_nlp = spacy.load(SPACY_MODEL_TYPE, disable=['parser', 'ner', 'pos'])
 tok_obj = SpacyTokenizer(spacy_nlp)
 
@@ -84,7 +83,6 @@ word_level_features: List[Callable[[str], float]] = [
     lambda x: len([c for c in x.lower() if c not in alphabet]) / len(x),
     lambda x: 1 if (remove_extra_chars(x.lower()) == x.lower()) else 0
 ]
-
 
 
 class TokenTransfomer:
@@ -125,6 +123,7 @@ class JigsawDatasetTransformer(DatasetReader):
     self.tok_transf = tok_transf
     self.token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
     self.max_seq_len = max_seq_len
+    self.headers = None
 
   @overrides
   def text_to_instance(self, tokens: List[str], id: str,
@@ -155,8 +154,10 @@ class JigsawDatasetTransformer(DatasetReader):
   @overrides
   def _read(self, file_path: str) -> Iterator[Instance]:
     with open(file_path) as f:
+
       reader = csv.reader(f)
-      next(reader)
+      self.headers = next(reader)
+
       for i, line in enumerate(reader):
         if len(line) == 9:
           _, id_, text, *labels = line
@@ -202,6 +203,22 @@ class JigsawDatasetTransformer(DatasetReader):
 
         objStr = json.dumps(obj)
         tf.write(objStr + '\n')
+
+  @staticmethod
+  def save_to_csv(data, file_path: str, headers: List[str]) -> None:
+
+    with open(file_path, 'w',newline='', encoding='utf-8') as csv_file:
+      writer = csv.writer(csv_file, delimiter=',')
+      writer.writerow(headers)
+
+      for _, instance in enumerate(data):
+
+        row = [instance.get("id").metadata,
+               ' '.join(list(instance.get("tokens").tokens)),
+               JigsawDatasetTransformer.to_int_list(instance.get("label").array)]
+
+        writer.writerow(row)
+
 
 def main(argv):
 

@@ -23,6 +23,9 @@ import spacy
 nlp = spacy.load('en_core_web_sm')
 
 DEBUG = True
+N_JOBS = 6
+MIN_DF = 50
+NUM_TERMS = 10000
 
 def tok(s): return [tok.text for tok in nlp.tokenizer(s)]
 
@@ -83,7 +86,7 @@ def main(argv):
                       help = 'Old jigsaw test file used in modeling')
   parser.add_argument('--numterms', type=int,
                       required = True,
-                      default = 1000,
+                      default = NUM_TERMS,
                       help = 'Number of terms for targeting')
 
 
@@ -99,8 +102,8 @@ def main(argv):
     print("Original file",len(donor_file))
     print("No leaks file", len(source_file))
 
-  vectorizer = CountVectorizer(tokenizer=tok, ngram_range=(1, 1))
-  clf = LogisticRegression()
+  vectorizer = CountVectorizer(tokenizer=tok, ngram_range=(1, 1),min_df=MIN_DF)
+  clf = LogisticRegression(n_jobs=N_JOBS)
   pipe = Pipeline([('vectorizer', vectorizer), ('clf', clf)])
 
   X = source_file['comment_text'].tolist()
