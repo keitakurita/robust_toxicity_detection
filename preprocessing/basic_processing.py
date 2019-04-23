@@ -33,6 +33,7 @@ from overrides import overrides
 from itertools import chain
 import numpy as np
 
+
 class SpacyTokenizer:
 
   def __init__(self, spacy_nlp):
@@ -90,7 +91,6 @@ class TokenTransfomer:
   def __init__(self, nlp):
 
     self.case_map_dict = get_canon_case_map(nlp)
-
 
   def proc(self, s: str) -> str:
     x = remove_extra_chars(s.lower())
@@ -165,6 +165,7 @@ class JigsawDatasetTransformer(DatasetReader):
           id_, text, *labels = line
         else:
           raise ValueError(f"line has {len(line)} values")
+
 
         text = text.replace('\n', ' ').replace('\r', ' ')
 

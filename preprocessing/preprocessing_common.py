@@ -11,6 +11,7 @@ from allennlp.data.fields import  MetadataField
 from allennlp.data.token_indexers import SingleIdTokenIndexer
 import random
 
+
 JIGSAW_LABEL_NAMES = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
 
 MAX_SEQ_LEN = 512
@@ -18,6 +19,7 @@ MAX_SEQ_LEN = 512
 NON_WORDS = ['@@UNKNOWN@@', '@@PADDING@@']
 
 SPACY_MODEL_TYPE = "en_core_web_sm"
+
 
 HOMO_SUBS = {'-': '˗', '9': '৭', '8': 'Ȣ', '7': '𝟕', '6': 'б', '5': 'Ƽ', '4': 'Ꮞ', '3': 'Ʒ', '2': 'ᒿ', '1': 'l',
              '0': 'O', "'": '`', 'a': 'ɑ', 'b': 'Ь', 'c': 'ϲ', 'd': 'ԁ', 'e': 'е', 'f': '𝚏', 'g': 'ɡ', 'h': 'հ',
@@ -31,6 +33,7 @@ def set_seed(seed):
   random.seed(seed)
   np.random.seed(seed)
   return seed
+
 
 class MemoryOptimizedTextField(TextField):
 
@@ -165,7 +168,5 @@ def query_index(index, K, query_arr, num_threads=0, efS=200):
         (end - start, float(end - start) / query_qty, num_threads * float(end - start) / query_qty))
 
   return res
-
-
 
 

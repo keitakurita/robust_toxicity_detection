@@ -132,7 +132,9 @@ class JigsawDatasetJSONLReader(DatasetReader):
     label_field = ArrayField(array=np.array(labels))
     fields["label"] = label_field
 
+
     fields["id"] = MetadataField(id)
+
 
     return Instance(fields)
 
