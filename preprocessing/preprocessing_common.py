@@ -28,6 +28,8 @@ HOMO_SUBS = {'-': '˗', '9': '৭', '8': 'Ȣ', '7': '𝟕', '6': 'б', '5': 'Ƽ'
 
 TokenList = List[Token]
 
+DEBUG = False
+
 def set_seed(seed):
   print('Set seed: ', seed)
   random.seed(seed)
@@ -125,8 +127,9 @@ def create_embed_index(embeds, num_threads = 0, M = 30, efC = 200):
   index_time_params = {'M': M, 'indexThreadQty': num_threads, 'efConstruction': efC}
   index.createIndex(index_time_params)
   end = time.time()
-  print('Index-time parameters', index_time_params)
-  print('Indexing time = %f' % (end - start))
+  if DEBUG:
+    print('Index-time parameters', index_time_params)
+    print('Indexing time = %f' % (end - start))
 
   return index
 
@@ -148,8 +151,9 @@ def create_word_index(words, num_threads = 0, M = 30, efC = 200):
   index_time_params = {'M': M, 'indexThreadQty': num_threads, 'efConstruction': efC}
   index.createIndex(index_time_params)
   end = time.time()
-  print('Index-time parameters', index_time_params)
-  print('Indexing time = %f' % (end - start))
+  if DEBUG:
+    print('Index-time parameters', index_time_params)
+    print('Indexing time = %f' % (end - start))
 
 
   return index
@@ -157,15 +161,17 @@ def create_word_index(words, num_threads = 0, M = 30, efC = 200):
 def query_index(index, K, query_arr, num_threads=0, efS=200):
   # Querying
   query_time_params = {'efSearch': efS}
-  print('Setting query-time parameters', query_time_params)
+  if DEBUG:
+    print('Setting query-time parameters', query_time_params)
   index.setQueryTimeParams(query_time_params)
 
   query_qty = len(query_arr)
   start = time.time()
   res = index.knnQueryBatch(query_arr, k=K, num_threads=num_threads)
   end = time.time()
-  print('kNN time total=%f (sec), per query=%f (sec), per query adjusted for thread number=%f (sec)' %
-        (end - start, float(end - start) / query_qty, num_threads * float(end - start) / query_qty))
+  if DEBUG:
+    print('kNN time total=%f (sec), per query=%f (sec), per query adjusted for thread number=%f (sec)' %
+          (end - start, float(end - start) / query_qty, num_threads * float(end - start) / query_qty))
 
   return res
 

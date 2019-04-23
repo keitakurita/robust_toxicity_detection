@@ -215,8 +215,11 @@ class JigsawDatasetTransformer(DatasetReader):
       for _, instance in enumerate(data):
 
         row = [instance.get("id").metadata,
-               ' '.join(list(instance.get("tokens").tokens)),
-               JigsawDatasetTransformer.to_int_list(instance.get("label").array)]
+               ' '.join(list(instance.get("tokens").tokens))]
+        #print(row)
+
+        row.extend(JigsawDatasetTransformer.to_int_list(instance.get("label").array))
+        #print(row)
 
         writer.writerow(row)
 

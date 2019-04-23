@@ -25,7 +25,7 @@ from allennlp.data.fields import  ArrayField, MetadataField
 import csv
 from allennlp.data.vocabulary import Vocabulary
 from preprocessing_common import *
-from basic_preprocessing import *
+from basic_processing import *
 import spacy
 
 from typing import *
@@ -35,10 +35,10 @@ import numpy as np
 
 
 NOISE_CONFIG={
-  'prob_example_tokens': 0.5,
-  'prob_example_distractors': 0.25,
-  'targets': {'prob_token': 0.75, 'prob_noise_type': (0.2,0.4,0.4)},
-  'nontargets': {'prob_token': 0.25, 'prob_noise_type': (0.2, 0.4, 0.4)},
+  'prob_example_tokens': 0.75,
+  'prob_example_distractors': 0.75,
+  'targets': {'prob_token': 0.90, 'probs_noise_type': (0.2,0.4,0.4)},
+  'nontargets': {'prob_token': 0.5, 'probs_noise_type': (0.2, 0.4, 0.4)},
   'prob_distractor_first': 0.5
 }
 
@@ -240,11 +240,14 @@ def main(argv):
   args = parser.parse_args(argv)
   print(args)
 
+  set_seed(31416)
+
   spacy_nlp = spacy.load(SPACY_MODEL_TYPE, disable=['parser', 'ner', 'pos'])
-  tok_obj = NoisingTokenizer(spacy_nlp,NOISE_CONFIG,
-                             os.path.join(args.datapath,args.toxtarget),
-                             os.path.join(args.datapath, args.basicvocab)
-                             )
+
+  noise_tok_obj = NoisingTokenizer(spacy_nlp, NOISE_CONFIG,
+                                    os.path.join(args.datapath, args.toxtarget),
+                                    os.path.join(args.datapath, args.basicvocab)
+                                    )
 
   spacy_ds = get_spacy_vocab_instances(spacy_nlp)
   vocab = Vocabulary.from_instances(spacy_ds)
@@ -255,8 +258,8 @@ def main(argv):
   )
 
   transformer = JigsawDatasetTransformer(
-    TokenTransfomer(tok_obj.spacy_nlp),
-    tokenizer=tokenizer,
+    TokenTransfomer(noise_tok_obj.spacy_nlp),
+    tokenizer=lambda x: noise_tok_obj(x),
     token_indexers={"tokens": token_indexer}
   )
 
@@ -264,15 +267,15 @@ def main(argv):
   test_ds = transformer.read(os.path.join(args.datapath,args.rawtest))
   full_ds = list(train_ds) + list(test_ds)
 
-  transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain+".jsonl"))
-  transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest+".jsonl"))
+  transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain_pref+".jsonl"))
+  transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest_pref+".jsonl"))
 
   transformer.save_to_csv(train_ds,
-                          os.path.join(args.datapath, args.proctrain+".csv"),
+                          os.path.join(args.datapath, args.proctrain_pref+".csv"),
                           transformer.headers)
 
   transformer.save_to_csv(test_ds,
-                          os.path.join(args.datapath, args.proctest+".csv"),
+                          os.path.join(args.datapath, args.proctest_pref+".csv"),
                           transformer.headers)
 
   # Need to re-init spacy from scratch
