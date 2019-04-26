@@ -24,8 +24,8 @@ nlp = spacy.load('en_core_web_sm')
 
 DEBUG = True
 N_JOBS = 6
-MIN_DF = 50
-NUM_TERMS = 10000
+MIN_DF = 3
+NUM_TERMS = 50000
 
 def tok(s): return [tok.text for tok in nlp.tokenizer(s)]
 
@@ -70,22 +70,22 @@ def main(argv):
   parser = argparse.ArgumentParser(description='Data loader')
   parser.add_argument('--datapath', type=str,
                       required=False,
-                      default = '',
-                      help = '../data/jigsaw/')
+                      default = '/home/anna/NNforNLP_Final/data/jigsaw/',
+                      help = 'Path to data folder')
   parser.add_argument('--donorfile', type=str,
-                      required = True,
+                      required = False,
                       default = 'train_new_jigsaw.csv',
                       help = 'New jigsaw file to source noise targets')
   parser.add_argument('--trainfile', type=str,
-                      required = True,
+                      required = False,
                       default = 'train.csv',
                       help = 'Old jigsaw train file used in core modeling')
   parser.add_argument('--testfile', type=str,
-                      required = True,
+                      required = False,
                       default = 'test_proced.csv',
                       help = 'Old jigsaw test file used in modeling')
   parser.add_argument('--numterms', type=int,
-                      required = True,
+                      required = False,
                       default = NUM_TERMS,
                       help = 'Number of terms for targeting')
 

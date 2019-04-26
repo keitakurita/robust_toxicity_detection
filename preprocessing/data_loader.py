@@ -96,13 +96,21 @@ class JigsawDatasetJSONLReader(DatasetReader):
                oov_token_swapper: OOVTokenSwapper,
                testing: bool = False,
                token_indexers: Dict[str, TokenIndexer] = None,
-               max_seq_len: Optional[int] = MAX_SEQ_LEN) -> None:
+               max_seq_len: Optional[int] = MAX_SEQ_LEN,
+               label_smoothing_eps = 0.) -> None:
     super().__init__(lazy=False)
     self.token_extender = token_extender
     self.token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
     self.oov_token_swapper = oov_token_swapper
     self.max_seq_len = max_seq_len
     self.testing = testing
+    self.label_smoothing_eps = label_smoothing_eps
+
+  def smooth_labels(self,labels):
+    if self.label_smoothing_eps > 0. :
+      return (1-self.label_smoothing_eps)*labels + self.label_smoothing_eps/2
+    else:
+      return labels
 
   @overrides
   def text_to_instance(self, tokens: List[str],
@@ -129,7 +137,7 @@ class JigsawDatasetJSONLReader(DatasetReader):
 
     fields["sentence_level_features"] = ArrayField(array=np.array(sl_feats))
 
-    label_field = ArrayField(array=np.array(labels))
+    label_field = ArrayField(array=self.smooth_labels(np.array(labels)))
     fields["label"] = label_field
 
 
