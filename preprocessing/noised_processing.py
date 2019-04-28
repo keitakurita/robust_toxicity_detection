@@ -33,9 +33,9 @@ import numpy as np
 
 NOISE_CONFIG={
   'prob_example_tokens': 0.99,
-  'prob_example_distractors': 0.99,
+  'prob_example_distractors': 0.01,
   'targets': {'prob_token': 0.99, 'probs_noise_type': (0.4, 0.4, 0.2)},
-  'nontargets': {'prob_token': 0.5, 'probs_noise_type': (0.2, 0.3, 0.5)},
+  'nontargets': {'prob_token': 0.01, 'probs_noise_type': (0.4, 0.4, 0.2)},
   'prob_distractor_first': 0.5,
   'number_of_distractors' : 2
 }
