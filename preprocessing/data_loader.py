@@ -13,6 +13,7 @@ metadata (id, raw text)
 
 import os, sys
 sys.path.append('.')
+sys.path.append('..')
 
 import argparse
 import json
@@ -56,26 +57,18 @@ class OOVTokenSwapper:
     max_score = 0
     swap_token = oov_token
     for c in candidates:
-      global_score, context_score, surface_score = candidates[c]
-      score =  self.gw * global_score + \
-               self.cw * context_score + \
-               self.sw * surface_score
+      score =  self.gw * candidates[c][FASTTEXT_SIMIL] + \
+               self.cw * candidates[c][BERT_SIMIL]  + \
+               self.sw * candidates[c][LEVEN_SIMIL]
       if score > max_score:
         max_score = score
         swap_token = c
 
     return swap_token
 
-  def _find_token_pos(self,
-                      oov_token=str,
-                      tokens=List[str]
-                      ) -> List:
-
-    return [i for i in range(len(tokens)) if tokens[i] == oov_token]
-
   def swap(self,
            tokens: List[str],
-           oov_tokens:  Dict[str, Dict[str, List[float]]] = None) -> List[str]:
+           oov_tokens:  List[Dict] = None) -> List[str]:
 
      if oov_tokens is None:
        pass
@@ -84,12 +77,15 @@ class OOVTokenSwapper:
        pass
 
      for oov in oov_tokens:
-       pos = self._find_token_pos(oov,tokens)
-       swap = self._get_token(oov,oov_tokens[oov])
-       tokens[pos] = swap
+       swap = self._get_token(oov['oov_token'],oov['cand_scores'])
+       if swap is not None:
+         pos = oov['sent_pos_oov']
+         tokens[pos] = swap
 
-@register("jigsaw")
-class JigsawDatasetJSONLReader(DatasetReader):
+     return tokens
+
+@register("toxicdata")
+class ToxicDatasetJSONLReader(DatasetReader):
 
   def __init__(self,
                token_extender : Callable[[str], List[str]],
@@ -118,7 +114,7 @@ class JigsawDatasetJSONLReader(DatasetReader):
                        sl_feats: List[float],
                        labels: List[int],
                        id: str,
-                       oov: Dict[str, Dict[str, List[float]]] = None) -> Instance:
+                       oov: List[Dict] = None) -> Instance:
 
     fields = {}
 
@@ -192,7 +188,7 @@ def main(argv):
     lowercase_tokens=True,
   )
 
-  reader = JigsawDatasetJSONLReader(
+  reader = ToxicDatasetJSONLReader(
     token_extender = dummy_token_extender,
     oov_token_swapper = OOVTokenSwapper(),
     token_indexers={"tokens": token_indexer}

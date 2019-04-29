@@ -13,10 +13,16 @@
 
 #jigsaw_noised_new
 
-for i in combined; do
+#for i in combined; do
 
-    python -u ./basic_processing.py --datapath ~/NNforNLP_Final/data/jigsaw_noised_new --rawtrain train_noise_${i}.csv --rawtest test_noise_${i}.csv --ftmatname ft_noised_${i}_toks --vocabname voc_noised_${i}_toks --proctrain train_noised_${i}.jsonl --proctest test_noised_${i}.jsonl --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin 2>&1|tee log_noised_old_${i}
+#    python -u ./basic_processing.py --datapath ~/NNforNLP_Final/data/jigsaw_noised_new --rawtrain train_noise_${i}.csv --rawtest test_noise_${i}.csv --ftmatname ft_noised_${i}_toks --vocabname voc_noised_${i}_toks --proctrain train_noised_${i}.jsonl --proctest test_noised_${i}.jsonl --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin 2>&1|tee log_noised_old_${i}
 
-done
+#done
 
+# Offenseval
 
+python -u ./basic_processing.py --datapath ~/NNforNLP_Final/data/offenseval --rawtrain train.csv --rawtest test.csv --ftmatname ft_basic_toks --vocabname voc_basic_toks --proctrain_pref train_basic --proctest_pref test_basic --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin 2>&1|tee log_basic_offenseval
+
+# Hateval
+
+python -u ./basic_processing.py --datapath ~/NNforNLP_Final/data/hateval --rawtrain train.csv --rawtest test.csv --ftmatname ft_basic_toks --vocabname voc_basic_toks --proctrain_pref train_basic --proctest_pref test_basic --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin --addtoxcol 2>&1|tee log_basic_offenseval

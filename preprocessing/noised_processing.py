@@ -33,7 +33,7 @@ import numpy as np
 
 NOISE_CONFIG={
   'prob_example_tokens': 0.99,
-  'prob_example_distractors': 0.01,
+  'prob_example_distractors': 0.99,
   'targets': {'prob_token': 0.99, 'probs_noise_type': (0.4, 0.4, 0.2)},
   'nontargets': {'prob_token': 0.01, 'probs_noise_type': (0.4, 0.4, 0.2)},
   'prob_distractor_first': 0.5,
@@ -279,6 +279,10 @@ def main(argv):
                       required = False,
                       default = 'voc_basic_toks/tokens.txt',
                       help = 'File with basic vocabulary')
+  parser.add_argument('--addtoxcol',
+                      action='store_true',
+                      help = 'Add a column to indicate overall toxicity')
+
 
   args = parser.parse_args(argv)
   print(args)
@@ -300,10 +304,11 @@ def main(argv):
     lowercase_tokens=True,
   )
 
-  transformer = JigsawDatasetTransformer(
+  transformer = ToxicDatasetTransformer(
     TokenTransfomer(noise_tok_obj.spacy_nlp),
     tokenizer=lambda x: noise_tok_obj(x),
-    token_indexers={"tokens": token_indexer}
+    token_indexers={"tokens": token_indexer},
+    add_tox_col="toxic" if args.addtoxcol else None
   )
 
   train_ds = transformer.read(os.path.join(args.datapath,args.rawtrain))

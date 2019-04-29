@@ -109,21 +109,21 @@ class TokenTransfomer:
     return remove_extra_chars(s)
 
 
-
-
-class JigsawDatasetTransformer(DatasetReader):
+class ToxicDatasetTransformer(DatasetReader):
 
   def __init__(self,
                tok_transf: TokenTransfomer,
                tokenizer: Callable[[str], List[str]] = lambda x: x.split(),
                token_indexers: Dict[str, TokenIndexer] = None, 
-               max_seq_len: Optional[int] = MAX_SEQ_LEN) -> None:
+               max_seq_len: Optional[int] = MAX_SEQ_LEN,
+               add_tox_col: str = None) -> None:
     super().__init__(lazy=False)
     self.tokenizer = tokenizer
     self.tok_transf = tok_transf
     self.token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
     self.max_seq_len = max_seq_len
     self.headers = None
+    self.add_tox_col = add_tox_col
 
   @overrides
   def text_to_instance(self, tokens: List[str], id: str,
@@ -157,11 +157,13 @@ class JigsawDatasetTransformer(DatasetReader):
 
       reader = csv.reader(f)
       self.headers = next(reader)
+      num_vals = len(self.headers)
+
+      if self.add_tox_col is not None:
+        self.headers.append(self.add_tox_col)
 
       for i, line in enumerate(reader):
-        if len(line) == 9:
-          _, id_, text, *labels = line
-        elif len(line) == 8:
+        if len(line) == num_vals:
           id_, text, *labels = line
         else:
           raise ValueError(f"line has {len(line)} values")
@@ -169,9 +171,15 @@ class JigsawDatasetTransformer(DatasetReader):
 
         text = text.replace('\n', ' ').replace('\r', ' ')
 
+        num_labels = [int(x) for x in labels]
+
+        if self.add_tox_col is not None:
+          num_labels.append(np.max(num_labels))
+
+
         yield self.text_to_instance(
           self.tokenizer(text),
-          id_, np.array([int(x) for x in labels]), text 
+          id_, np.array(num_labels), text
         )
 
   @staticmethod
@@ -195,10 +203,10 @@ class JigsawDatasetTransformer(DatasetReader):
       for _, instance in enumerate(data):
 
         obj = {"id": instance.get("id").metadata,
-               "label" : JigsawDatasetTransformer.to_int_list(instance.get("label").array),
+               "label" : ToxicDatasetTransformer.to_int_list(instance.get("label").array),
                "tokens": list(instance.get("tokens").tokens),
-               "word_level_features" : JigsawDatasetTransformer.to_float_list(instance.get("word_level_features").array),
-               "sentence_level_features": JigsawDatasetTransformer.to_float_list(instance.get("sentence_level_features").array),
+               "word_level_features" : ToxicDatasetTransformer.to_float_list(instance.get("word_level_features").array),
+               "sentence_level_features": ToxicDatasetTransformer.to_float_list(instance.get("sentence_level_features").array),
                "text" : instance.get("text").metadata                  }
 
 
@@ -218,10 +226,11 @@ class JigsawDatasetTransformer(DatasetReader):
                ' '.join(list(instance.get("tokens").tokens))]
         #print(row)
 
-        row.extend(JigsawDatasetTransformer.to_int_list(instance.get("label").array))
+        row.extend(ToxicDatasetTransformer.to_int_list(instance.get("label").array))
         #print(row)
 
         writer.writerow(row)
+
 
 
 def main(argv):
@@ -247,18 +256,22 @@ def main(argv):
                       required = False,
                       default = 'voc_basic_toks',
                       help = 'Output vocabulary file')
-  parser.add_argument('--proctrain', type=str,
+  parser.add_argument('--proctrain_pref', type=str,
                       required = False,
-                      default = 'train_basic.jsonl',
+                      default = 'train_basic',
                       help = 'Output train file')
-  parser.add_argument('--proctest', type=str,
+  parser.add_argument('--proctest_pref', type=str,
                       required = False,
-                      default = 'test_basic.jsonl',
+                      default = 'test_basic',
                       help = 'Summary test file')
   parser.add_argument('--ftmodelpath', type=str,
                       required = False,
                       default = 'wiki.en.bin',
                       help = 'Summary test file')
+  parser.add_argument('--addtoxcol',
+                      action='store_true',
+                      help = 'Add a column to indicate overall toxicity')
+
 
   args = parser.parse_args(argv)
   print(args)
@@ -271,18 +284,28 @@ def main(argv):
     lowercase_tokens=True,
   )
 
-  transformer = JigsawDatasetTransformer(
+  transformer = ToxicDatasetTransformer(
     TokenTransfomer(tok_obj.spacy_nlp),
     tokenizer=tokenizer,
-    token_indexers={"tokens": token_indexer}
+    token_indexers={"tokens": token_indexer},
+    add_tox_col = "toxic" if args.addtoxcol else None
   )
 
   train_ds = transformer.read(os.path.join(args.datapath,args.rawtrain))
   test_ds = transformer.read(os.path.join(args.datapath,args.rawtest))
   full_ds = list(train_ds) + list(test_ds)
 
-  transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain))
-  transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest))
+  transformer.save_to_file(train_ds, os.path.join(args.datapath, args.proctrain_pref+".jsonl"))
+  transformer.save_to_file(test_ds, os.path.join(args.datapath, args.proctest_pref+".jsonl"))
+
+  transformer.save_to_csv(train_ds,
+                          os.path.join(args.datapath, args.proctrain_pref+".csv"),
+                          transformer.headers)
+
+  transformer.save_to_csv(test_ds,
+                          os.path.join(args.datapath, args.proctest_pref+".csv"),
+                          transformer.headers)
+
 
   # Need to re-init spacy from scratch
   spacy_ds = get_spacy_vocab_instances(spacy_nlp)

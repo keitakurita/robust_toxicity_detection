@@ -121,6 +121,31 @@
 #   'number_of_distractors' : 2
 #}
 
-python -u ./noised_processing.py --datapath ~/NNforNLP_Final/data/jigsaw --rawtrain train.csv --rawtest test_proced.csv --ftmatname ft_noised_large_toks --vocabname voc_noised_large_toks --proctrain_pref train_noised_large --proctest_pref test_noised_large --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin --toxtarget toxic_targets.txt --basicvocab voc_basic_toks/tokens.txt 2>&1|tee log_test_noise
+#python -u ./noised_processing.py --datapath ~/NNforNLP_Final/data/jigsaw --rawtrain train.csv --rawtest test_proced.csv --ftmatname ft_noised_large_toks --vocabname voc_noised_large_toks --proctrain_pref train_noised_large --proctest_pref test_noised_large --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin --toxtarget toxic_targets.txt --basicvocab voc_basic_toks/tokens.txt 2>&1|tee log_test_noise
 
 
+# Generate the Offenseval TRAIN set with policy - 50k toxic terms and asymmetric hard noise only, WITH distractors
+
+#NOISE_CONFIG={
+#  'prob_example_tokens': 0.99,
+#  'prob_example_distractors': 0.99,
+#  'targets': {'prob_token': 0.99, 'probs_noise_type': (0.4, 0.4, 0.2)},
+#  'nontargets': {'prob_token': 0.01, 'probs_noise_type': (0.4, 0.4, 0.2)},
+#  'prob_distractor_first': 0.5,
+#   'number_of_distractors' : 2
+#}
+
+python -u ./noised_processing.py --datapath ~/NNforNLP_Final/data/offenseval --rawtrain train.csv --rawtest test.csv --ftmatname ft_noised_distract_large_toks --vocabname voc_noised_distract_large_toks --proctrain_pref train_noised_distract_large --proctest_pref test_noised_distract_large --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin --toxtarget toxic_targets.txt --basicvocab voc_basic_toks/tokens.txt 2>&1|tee log_test_noise
+
+# Generate the Hateval TRAIN set with policy - 50k toxic terms and asymmetric hard noise only, WITH distractors
+
+#NOISE_CONFIG={
+#  'prob_example_tokens': 0.99,
+#  'prob_example_distractors': 0.99,
+#  'targets': {'prob_token': 0.99, 'probs_noise_type': (0.4, 0.4, 0.2)},
+#  'nontargets': {'prob_token': 0.01, 'probs_noise_type': (0.4, 0.4, 0.2)},
+#  'prob_distractor_first': 0.5,
+#   'number_of_distractors' : 2
+#}
+
+python -u ./noised_processing.py --datapath ~/NNforNLP_Final/data/hateval --rawtrain train.csv --rawtest test.csv --ftmatname ft_noised_distract_large_toks --vocabname voc_noised_distract_large_toks --proctrain_pref train_noised_distract_large --proctest_pref test_noised_distract_large --ftmodelpath ~/NNforNLP_Final/data/jigsaw/wiki.en.bin --toxtarget toxic_targets.txt --basicvocab voc_basic_toks/tokens.txt --addtoxcol 2>&1|tee log_test_noise
